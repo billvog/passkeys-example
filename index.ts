@@ -5,8 +5,14 @@ import base64url from "base64url";
 import bodyParser from "body-parser";
 import cors from "cors";
 import express from "express";
-import { convertChallenge, getNewChallenge } from "./helpers";
 import path from "path";
+import {
+  convertChallenge,
+  decodeJwtToken,
+  generateJwtToken,
+  getNewChallenge,
+} from "./helpers";
+import type { User } from "./types";
 
 // Create and configure the express app
 const app = express();
@@ -15,11 +21,7 @@ app.use(cors({ origin: "*" }));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-let users: {
-  [
-    key: string
-  ]: SimpleWebAuthnServer.VerifiedRegistrationResponse["registrationInfo"];
-} = {};
+let users: { [key: string]: User } = {};
 let challenges: { [key: string]: string } = {};
 
 const rpId = "localhost";
@@ -84,12 +86,19 @@ app.post("/register/finish", async (req, res) => {
   }
 
   const { verified, registrationInfo } = verification;
-  if (!verified) {
+  if (!verified || !registrationInfo) {
     return res.status(500).send({ success: false });
   }
 
-  users[username] = registrationInfo;
-  return res.status(200).send({ success: true });
+  // Store user
+  users[username] = {
+    username,
+    registrationInfo,
+  };
+
+  // Generate JWT token and return
+  const token = generateJwtToken(username);
+  return res.status(200).send({ success: true, token });
 });
 
 app.post("/login/start", (req, res) => {
@@ -107,7 +116,7 @@ app.post("/login/start", (req, res) => {
     allowCredentials: [
       {
         type: "public-key",
-        id: users[username].credentialID,
+        id: users[username].registrationInfo!.credentialID,
         transports: ["internal"],
       },
     ],
@@ -127,7 +136,7 @@ app.post("/login/finish", async (req, res) => {
     verification = await SimpleWebAuthnServer.verifyAuthenticationResponse({
       expectedChallenge: challenges[username],
       response: req.body.data,
-      authenticator: user,
+      authenticator: user.registrationInfo!,
       expectedRPID: rpId,
       expectedOrigin: expectedOrigin,
       requireUserVerification: false,
@@ -142,5 +151,31 @@ app.post("/login/finish", async (req, res) => {
     return res.status(500).send({ success: false });
   }
 
-  return res.status(200).send({ success: true });
+  // Generate JWT token and return
+  const token = generateJwtToken(username);
+  return res.status(200).send({ success: true, token });
+});
+
+// Authentication middleware
+app.use("/auth", (req, _, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (token) {
+    try {
+      const decodedToken = decodeJwtToken(token);
+      const username = decodedToken.username;
+      req.user = users[username];
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  next();
+});
+
+app.get("/auth/me", (req, res) => {
+  if (req.user) {
+    return res.json(req.user);
+  }
+
+  return res.status(401).send({ error: "Unauthorized" });
 });
