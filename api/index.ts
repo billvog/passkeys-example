@@ -25,14 +25,12 @@ let users: { [key: string]: User } = {};
 let challenges: { [key: string]: string } = {};
 
 const rpId = "localhost";
-const expectedOrigin = ["http://localhost:3000"];
+const expectedOrigin = ["http://localhost:5173"];
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("Server started on port", PORT);
 });
-
-app.use(express.static(path.join(__dirname, "client/dist")));
 
 app.post("/register/start", (req, res) => {
   let username = req.body.username as string;

@@ -16,7 +16,7 @@ function App() {
     }
 
     (async () => {
-      const user = await fetch("/auth/me", {
+      const user = await fetch("http://localhost:3000/auth/me", {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((response) => response.json())
@@ -29,7 +29,7 @@ function App() {
   }, [token]);
 
   async function register() {
-    const publicKey = await fetch("/register/start", {
+    const publicKey = await fetch("http://localhost:3000/register/start", {
       body: JSON.stringify({ username }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -37,7 +37,7 @@ function App() {
 
     const fidoData = await fido2Create(publicKey, username);
 
-    const response = await fetch("/register/finish", {
+    const response = await fetch("http://localhost:3000/register/finish", {
       body: JSON.stringify(fidoData),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -53,7 +53,7 @@ function App() {
   }
 
   async function login() {
-    const response = await fetch("/login/start", {
+    const response = await fetch("http://localhost:3000/login/start", {
       body: JSON.stringify({ username }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
@@ -67,7 +67,7 @@ function App() {
     const options = response as PublicKeyCredentialRequestOptions;
     const assertion = await fido2Get(options, username);
 
-    const loginResponse = await fetch("/login/finish", {
+    const loginResponse = await fetch("http://localhost:3000/login/finish", {
       body: JSON.stringify(assertion),
       headers: { "Content-Type": "application/json" },
       method: "POST",
